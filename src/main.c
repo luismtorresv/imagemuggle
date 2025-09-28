@@ -51,6 +51,9 @@ static void flat_to_3d(unsigned char *flat, Image3D *im) {
 static void print_menu(void) {
   printf("\nImage Processing Menu\n");
   printf("1) Convolution (3x3 blur)\n");
+  printf("  1a) Light blur\n");
+  printf("  1b) Medium blur\n");
+  printf("  1c) Heavy blur\n");
   printf("2) Sobel edge detection\n");
   printf("3) Rotate (degrees)\n");
   printf("4) Resize (new width/height)\n");
@@ -101,15 +104,44 @@ int main(int argc, char **argv) {
       break;
     }
     if (op == 1) {
-      // Blur 3x3
+      // Blur options
+      printf("Choose blur strength:\n");
+      printf("  a) Light blur (1x)\n");
+      printf("  b) Medium blur (3x applications)\n");
+      printf("  c) Heavy blur (5x applications)\n");
+      printf("Choice (a/b/c): ");
+      char choice;
+      scanf(" %c", &choice);
+
       float k[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
       for (int i = 0; i < 9; i++)
         k[i] /= 9.0f;
-      conv_concurrente(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4);
-      // swap
-      unsigned char ***tmp = src;
-      src = dst.m;
-      dst.m = tmp;
+
+      int applications = 1;
+      switch (choice) {
+      case 'a':
+        applications = 1;
+        break;
+      case 'b':
+        applications = 3;
+        break;
+      case 'c':
+        applications = 10;
+        break;
+      default:
+        printf("Invalid choice, using light blur\n");
+        applications = 1;
+      }
+
+      // Apply blur multiple times for stronger effect
+      for (int i = 0; i < applications; i++) {
+        conv_concurrente(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4);
+        // swap buffers
+        unsigned char ***tmp = src;
+        src = dst.m;
+        dst.m = tmp;
+      }
+      printf("Applied blur %d time(s)\n", applications);
     } else if (op == 2) {
       sobel_concurrente(src, dst.m, w, h, c, 4);
       unsigned char ***tmp = src;

@@ -8,7 +8,8 @@ with multi-threaded row-based parallelization.
 ## Features
 
 - **Convolution**: Applies 3×3/5×5 kernels with clamp padding, configurable
-  factor and bias parameters
+  factor and bias parameters. Multiple application modes (light, medium, heavy)
+  for enhanced blur effects through iterative convolution
 - **Sobel Edge Detection**: Computes gradients on luminance (RGB) with single or
   three-channel output
 - **Image Rotation**: Inverse mapping with bilinear interpolation around image
