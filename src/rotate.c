@@ -19,15 +19,15 @@ static void* worker_rotate(void* p){
     float cosA = cosf(a->ang_rad), sinA = sinf(a->ang_rad);
     float cx = a->cx, cy = a->cy;
     for (int y = a->y0; y < a->y1; y++){
-        for (int x = 0; x < a->ancho; x++){
+        for (int x = 0; x < a->width; x++){
             float xd = x - cx, yd = y - cy;
-            // mapeo inverso
+            // inverse mapping
             float xs =  cosA*xd + sinA*yd + cx;
             float ys = -sinA*xd + cosA*yd + cy;
-            for (int c = 0; c < a->canales; c++){
+            for (int c = 0; c < a->channels; c++){
                 unsigned char val = 0;
-                if (xs >= 0 && xs < a->ancho && ys >= 0 && ys < a->alto)
-                    val = bilinear(a->src, a->ancho, a->alto, c, xs, ys);
+                if (xs >= 0 && xs < a->width && ys >= 0 && ys < a->height)
+                    val = bilinear(a->src, a->width, a->height, c, xs, ys);
                 a->dst[y][x][c] = val;
             }
         }
@@ -36,10 +36,10 @@ static void* worker_rotate(void* p){
 }
 
 int rotate_concurrente(unsigned char*** src, unsigned char*** dst,
-                       int ancho, int alto, int canales,
-                       float ang_deg, int num_hilos){
-    WorkArgs base = {.src=src,.dst=dst,.ancho=ancho,.alto=alto,.canales=canales};
-    base.cx = (ancho-1)/2.0f; base.cy = (alto-1)/2.0f;
+                       int width, int height, int channels,
+                       float ang_deg, int num_threads){
+    WorkArgs base = {.src=src,.dst=dst,.width=width,.height=height,.channels=channels};
+    base.cx = (width-1)/2.0f; base.cy = (height-1)/2.0f;
     base.ang_rad = ang_deg * (float)M_PI / 180.0f;
-    return lanzar_hilos_por_filas(worker_rotate, base, num_hilos);
+    return launch_threads_by_rows(worker_rotate, base, num_threads);
 }

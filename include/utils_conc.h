@@ -3,31 +3,31 @@
 #include <pthread.h>
 
 typedef struct {
-    unsigned char*** src;   // lectura
-    unsigned char*** dst;   // escritura
-    int ancho, alto, canales;
-    int y0, y1;             // rango [y0, y1)
+    unsigned char*** src;   // read
+    unsigned char*** dst;   // write
+    int width, height, channels;
+    int y0, y1;             // range [y0, y1)
 
-    // Convolución
+    // Convolution
     const float* kernel; int k; float factor; float bias;
-    // Rotación
+    // Rotation
     float cx, cy, ang_rad;
     // Resize
     float scale_x, scale_y;
 } WorkArgs;
 
-// Crea matriz 3D [alto][ancho][canales] contigua en memoria
-unsigned char*** crearMatriz3D(int alto, int ancho, int canales);
-// Libera creada por crearMatriz3D
-void liberarMatriz3D(unsigned char*** m);
-// Copia de src->dst (mismas dims)
-void copiar3D(unsigned char*** src, unsigned char*** dst, int ancho, int alto, int canales);
+// Creates 3D matrix [height][width][channels] contiguous in memory
+unsigned char*** create3DMatrix(int height, int width, int channels);
+// Frees matrix created by create3DMatrix
+void free3DMatrix(unsigned char*** m);
+// Copy from src->dst (same dims)
+void copy3D(unsigned char*** src, unsigned char*** dst, int width, int height, int channels);
 
-// Lanza N hilos ejecutando 'worker' con división por filas
-int lanzar_hilos_por_filas(void* (*worker)(void*), WorkArgs base, int num_hilos);
+// Launch N threads executing 'worker' with row division
+int launch_threads_by_rows(void* (*worker)(void*), WorkArgs base, int num_threads);
 
-// Utilidades de I/O (stb opcional)
-int cargarPNG(const char* path, unsigned char**** out_px, int* w, int* h, int* ch);
-int guardarPNG(const char* path, unsigned char*** px, int w, int h, int ch);
+// I/O utilities (optional stb)
+int loadPNG(const char* path, unsigned char**** out_px, int* w, int* h, int* ch);
+int savePNG(const char* path, unsigned char*** px, int w, int h, int ch);
 
 #endif

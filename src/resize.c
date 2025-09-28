@@ -20,25 +20,25 @@ static unsigned char bilinear(unsigned char*** src, int w, int h, int c, float x
 static void* worker_resize(void* p){
     ResizeArgs* R = (ResizeArgs*)p;
     WorkArgs* a = &R->a;
-    float sx = (float)a->ancho / (float)R->nw;
-    float sy = (float)a->alto  / (float)R->nh;
+    float sx = (float)a->width / (float)R->nw;
+    float sy = (float)a->height  / (float)R->nh;
     for (int y = a->y0; y < a->y1 && y < R->nh; y++){
         for (int x = 0; x < R->nw; x++){
             float xs = (x + 0.5f) * sx - 0.5f;
             float ys = (y + 0.5f) * sy - 0.5f;
-            for (int c = 0; c < a->canales; c++){
-                a->dst[y][x][c] = bilinear(a->src, a->ancho, a->alto, c, xs, ys);
+            for (int c = 0; c < a->channels; c++){
+                a->dst[y][x][c] = bilinear(a->src, a->width, a->height, c, xs, ys);
             }
         }
     }
     return NULL;
 }
 
-int resize_concurrente(unsigned char*** src, int w, int h, int canales,
+int resize_concurrente(unsigned char*** src, int w, int h, int channels,
                        unsigned char*** dst, int nw, int nh,
-                       int num_hilos){
-    WorkArgs base = {.src=src,.dst=dst,.ancho=w,.alto=h,.canales=canales};
+                       int num_threads){
+    WorkArgs base = {.src=src,.dst=dst,.width=w,.height=h,.channels=channels};
     ResizeArgs R; R.a = base; R.nw = nw; R.nh = nh;
-    R.a.alto = nh; // división por filas en destino
-    return lanzar_hilos_por_filas((void*(*)(void*))worker_resize, R.a, num_hilos);
+    R.a.height = nh; // row division in destination
+    return launch_threads_by_rows((void*(*)(void*))worker_resize, R.a, num_threads);
 }

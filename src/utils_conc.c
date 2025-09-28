@@ -14,77 +14,76 @@
 
 #include "utils_conc.h"
 
-unsigned char*** crearMatriz3D(int alto, int ancho, int canales){
-    // layout contiguo: [alto * ancho * canales] + tablas de punteros
-    unsigned char* data = (unsigned char*)calloc((size_t)alto*ancho*canales, 1);
+unsigned char*** create3DMatrix(int height, int width, int channels){
+    // contiguous layout: [height * width * channels] + pointer tables
+    unsigned char* data = (unsigned char*)calloc((size_t)height*width*channels, 1);
     if(!data) return NULL;
-    unsigned char*** m = (unsigned char***)malloc(sizeof(unsigned char**)*alto);
+    unsigned char*** m = (unsigned char***)malloc(sizeof(unsigned char**)*height);
     if(!m){ free(data); return NULL; }
-    for(int y=0;y<alto;y++){
-        m[y] = (unsigned char**)malloc(sizeof(unsigned char*)*ancho);
+    for(int y=0;y<height;y++){
+        m[y] = (unsigned char**)malloc(sizeof(unsigned char*)*width);
         if(!m[y]){ for(int i=0;i<y;i++) free(m[i]); free(m); free(data); return NULL; }
-        for(int x=0;x<ancho;x++){
-            m[y][x] = data + ((size_t)y*ancho + x)*canales;
+        for(int x=0;x<width;x++){
+            m[y][x] = data + ((size_t)y*width + x)*channels;
         }
     }
     return m;
 }
 
-void liberarMatriz3D(unsigned char*** m){
+void free3DMatrix(unsigned char*** m){
     if(!m) return;
     unsigned char* base = NULL;
-    // El primer píxel apunta al bloque contiguo
+    // The first pixel points to the contiguous block
     if(m[0] && m[0][0]) base = m[0][0];
-    int alto = 0; // no tenemos dims aquí; el caller debe conocerlas y liberar filas
-    // No podemos conocer 'alto' desde aquí sin almacenarlo; suelta filas y bloque contiguo.
-    // Asumimos patrón de creación: liberar filas hasta NULL y luego el bloque base.
-    // Para simplificar, pedimos al caller liberar manualmente:
-    //   for (int y=0;y<alto;y++) free(m[y]);
+    int height = 0; // we don't have dims here; caller must know them and free rows
+    // We can't know 'height' from here without storing it; release rows and contiguous block.
+    // To simplify, we ask the caller to free manually:
+    //   for (int y=0;y<height;y++) free(m[y]);
     //   free(m); free(base);
-    // Para evitar errores, no hacemos nada aquí.
+    // To avoid errors, we do nothing here.
 }
 
-void copiar3D(unsigned char*** src, unsigned char*** dst, int ancho, int alto, int canales){
-    for(int y=0;y<alto;y++){
-        for(int x=0;x<ancho;x++){
-            memcpy(dst[y][x], src[y][x], (size_t)canales);
+void copy3D(unsigned char*** src, unsigned char*** dst, int width, int height, int channels){
+    for(int y=0;y<height;y++){
+        for(int x=0;x<width;x++){
+            memcpy(dst[y][x], src[y][x], (size_t)channels);
         }
     }
 }
 
-int lanzar_hilos_por_filas(void* (*worker)(void*), WorkArgs base, int num_hilos){
-    if(num_hilos < 1) num_hilos = 1;
-    pthread_t* tids = (pthread_t*)malloc(sizeof(pthread_t)*num_hilos);
-    WorkArgs* args = (WorkArgs*)malloc(sizeof(WorkArgs)*num_hilos);
+int launch_threads_by_rows(void* (*worker)(void*), WorkArgs base, int num_threads){
+    if(num_threads < 1) num_threads = 1;
+    pthread_t* tids = (pthread_t*)malloc(sizeof(pthread_t)*num_threads);
+    WorkArgs* args = (WorkArgs*)malloc(sizeof(WorkArgs)*num_threads);
     if(!tids || !args){ perror("malloc"); free(tids); free(args); return -1; }
-    int filas = base.alto;
-    int por = (int)ceil((double)filas / num_hilos);
-    for(int i=0;i<num_hilos;i++){
+    int rows = base.height;
+    int per_thread = (int)ceil((double)rows / num_threads);
+    for(int i=0;i<num_threads;i++){
         args[i] = base;
-        args[i].y0 = i*por;
-        args[i].y1 = args[i].y0 + por;
-        if(args[i].y0 > filas) args[i].y0 = filas;
-        if(args[i].y1 > filas) args[i].y1 = filas;
+        args[i].y0 = i*per_thread;
+        args[i].y1 = args[i].y0 + per_thread;
+        if(args[i].y0 > rows) args[i].y0 = rows;
+        if(args[i].y1 > rows) args[i].y1 = rows;
         if(pthread_create(&tids[i], NULL, worker, &args[i]) != 0){
             perror("pthread_create"); free(tids); free(args); return -1;
         }
     }
-    for(int i=0;i<num_hilos;i++) pthread_join(tids[i], NULL);
+    for(int i=0;i<num_threads;i++) pthread_join(tids[i], NULL);
     free(tids); free(args);
     return 0;
 }
 
-// ------- Opcional: I/O con stb --------
-int cargarPNG(const char* path, unsigned char**** out_px, int* w, int* h, int* ch){
+// ------- Optional: I/O with stb --------
+int loadPNG(const char* path, unsigned char**** out_px, int* w, int* h, int* ch){
 #ifndef USE_STB
-    fprintf(stderr, "[WARN] cargarPNG requiere stb (define USE_STB e incluye headers)\n");
+    fprintf(stderr, "[WARN] loadPNG requires stb (define USE_STB and include headers)\n");
     return -1;
 #else
     int x,y,c;
     unsigned char* data = stbi_load(path, &x, &y, &c, 0);
-    if(!data){ fprintf(stderr, "Error cargando %s\n", path); return -1; }
+    if(!data){ fprintf(stderr, "Error loading %s\n", path); return -1; }
     *w = x; *h = y; *ch = c;
-    unsigned char*** m = crearMatriz3D(y, x, c);
+    unsigned char*** m = create3DMatrix(y, x, c);
     if(!m){ stbi_image_free(data); return -1; }
     size_t row_bytes = (size_t)x * c;
     for(int yy=0; yy<y; yy++){
@@ -98,9 +97,9 @@ int cargarPNG(const char* path, unsigned char**** out_px, int* w, int* h, int* c
 #endif
 }
 
-int guardarPNG(const char* path, unsigned char*** px, int w, int h, int ch){
+int savePNG(const char* path, unsigned char*** px, int w, int h, int ch){
 #ifndef USE_STB
-    fprintf(stderr, "[WARN] guardarPNG requiere stb (define USE_STB e incluye headers)\n");
+    fprintf(stderr, "[WARN] savePNG requires stb (define USE_STB and include headers)\n");
     return -1;
 #else
     unsigned char* flat = (unsigned char*)malloc((size_t)w*h*ch);

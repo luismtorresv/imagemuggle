@@ -14,13 +14,13 @@ static void* worker_conv(void* p){
     WorkArgs* a = (WorkArgs*)p;
     int r = a->k / 2;
     for (int y = a->y0; y < a->y1; y++){
-        for (int x = 0; x < a->ancho; x++){
-            for (int c = 0; c < a->canales; c++){
+        for (int x = 0; x < a->width; x++){
+            for (int c = 0; c < a->channels; c++){
                 float acc = 0.0f;
                 for (int ky = -r; ky <= r; ky++){
                     for (int kx = -r; kx <= r; kx++){
                         int yy = y + ky, xx = x + kx;
-                        clamp_xy(&xx, &yy, a->ancho, a->alto);
+                        clamp_xy(&xx, &yy, a->width, a->height);
                         int ki = (ky + r)*a->k + (kx + r);
                         acc += a->src[yy][xx][c] * a->kernel[ki];
                     }
@@ -35,11 +35,11 @@ static void* worker_conv(void* p){
 
 int conv_concurrente(unsigned char*** src,
                      unsigned char*** dst,
-                     int ancho, int alto, int canales,
+                     int width, int height, int channels,
                      const float* kernel, int k,
                      float factor, float bias,
-                     int num_hilos){
-    WorkArgs base = {.src=src,.dst=dst,.ancho=ancho,.alto=alto,.canales=canales,
+                     int num_threads){
+    WorkArgs base = {.src=src,.dst=dst,.width=width,.height=height,.channels=channels,
                      .kernel=kernel,.k=k,.factor=factor,.bias=bias};
-    return lanzar_hilos_por_filas(worker_conv, base, num_hilos);
+    return launch_threads_by_rows(worker_conv, base, num_threads);
 }

@@ -4,7 +4,7 @@
 
 int sobel_concurrente(unsigned char*** src,
                       unsigned char*** dst,
-                      int ancho, int alto, int canales,
-                      int num_hilos);
+                      int width, int height, int channels,
+                      int num_threads);
 
 #endif

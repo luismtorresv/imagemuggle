@@ -4,9 +4,9 @@
 
 int conv_concurrente(unsigned char*** src,
                      unsigned char*** dst,
-                     int ancho, int alto, int canales,
+                     int width, int height, int channels,
                      const float* kernel, int k,
                      float factor, float bias,
-                     int num_hilos);
+                     int num_threads);
 
 #endif
