@@ -1,5 +1,6 @@
 #include "resize.h"
 #include <math.h>
+#include <pthread.h>
 #include <string.h>
 
 typedef struct {
@@ -48,11 +49,33 @@ int resize_concurrente(unsigned char ***src, int w, int h, int channels,
                        unsigned char ***dst, int nw, int nh, int num_threads) {
   WorkArgs base = {
       .src = src, .dst = dst, .width = w, .height = h, .channels = channels};
-  ResizeArgs R;
-  R.a = base;
-  R.nw = nw;
-  R.nh = nh;
-  R.a.height = nh; // row division in destination
-  return launch_threads_by_rows((void *(*)(void *))worker_resize, R.a,
-                                num_threads);
+
+  // Create array of ResizeArgs for each thread
+  ResizeArgs *thread_args = malloc(num_threads * sizeof(ResizeArgs));
+  pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
+
+  int rows_per_thread = nh / num_threads;
+  int remainder = nh % num_threads;
+
+  for (int i = 0; i < num_threads; i++) {
+    thread_args[i].a = base;
+    thread_args[i].nw = nw;
+    thread_args[i].nh = nh;
+
+    // Calculate row range for this thread
+    thread_args[i].a.y0 = i * rows_per_thread + (i < remainder ? i : remainder);
+    thread_args[i].a.y1 =
+        thread_args[i].a.y0 + rows_per_thread + (i < remainder ? 1 : 0);
+
+    pthread_create(&threads[i], NULL, worker_resize, &thread_args[i]);
+  }
+
+  // Wait for all threads
+  for (int i = 0; i < num_threads; i++) {
+    pthread_join(threads[i], NULL);
+  }
+
+  free(thread_args);
+  free(threads);
+  return 0;
 }
