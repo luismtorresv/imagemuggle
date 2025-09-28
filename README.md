@@ -1,69 +1,88 @@
-# Reto 2 — Procesamiento de imágenes concurrente (C + pthread)
+# `imagemuggle` - Image Processing Concurrent Extension in C
 
-Este scaffold contiene el **menú**, el **patrón de hilos** y las implementaciones de **Convolución**, **Sobel**, **Rotación** y **Resize** listas para integrarlas con tu base.
-Funciona con una estructura de imagen `unsigned char***` (alto × ancho × canales).
+A concurrent image processing application implementing convolution, Sobel edge
+detection, rotation, and bilinear scaling operations using POSIX threads. The
+system processes PNG images through a 3D matrix structure (`unsigned char***`)
+with multi-threaded row-based parallelization.
 
-## Cómo usarlo
+## Features
 
-Tienes **dos opciones**:
+- **Convolution**: Applies 3×3/5×5 kernels with clamp padding, configurable
+  factor and bias parameters
+- **Sobel Edge Detection**: Computes gradients on luminance (RGB) with single or
+  three-channel output
+- **Image Rotation**: Inverse mapping with bilinear interpolation around image
+  center
+- **Bilinear Scaling**: Destination-to-source scaling without severe aliasing
+- **Thread Management**: Row-based division (`y0..y1`) using
+  `pthread_create/join`
 
-### Opción A — Integrarlo con **tu base existente** (recomendada)
-1. Copia `include/` y `src/` dentro de tu proyecto.
-2. En tu `main.c` (o archivo principal):
-   - Incluye los headers:  
-     ```c
-     #include "utils_conc.h"
-     #include "conv.h"
-     #include "sobel.h"
-     #include "rotate.h"
-     #include "resize.h"
-     ```
-   - Usa tus propias funciones de **carga/guardado** (PNG con stb, etc.).
-   - Usa `crearMatriz3D`/`liberarMatriz3D` para alocar destinos y `lanzar_hilos_por_filas(...)` para paralelizar.
+## Installation
 
-### Opción B — Probarlo **standalone** con stb (rápido)
-1. Descarga los headers de stb y colócalos en `third_party/`:
-   - `stb_image.h`
-   - `stb_image_write.h`
-2. Compila con:
-   ```bash
-   gcc -O2 -Wall -Wextra -Iinclude -Ithird_party -o reto2        src/main.c src/conv.c src/sobel.c src/rotate.c src/resize.c -pthread -lm
-   ```
-3. Ejecuta:
-   ```bash
-   ./reto2 input.png output.png
-   ```
-   Sigue el **menú** interactivo. Puedes aplicar múltiples operaciones y guardar.
+### Requirements
+- GCC compiler with C99 support
+- POSIX threads library
+- Math library (`-lm`)
+- STB image libraries (included)
 
-> Nota: Si no usas stb, puedes reemplazar `cargarPNG`/`guardarPNG` por tus funciones existentes sin tocar el resto.
+### Build
 
-## Estructura
-```
-reto2-concurrente/
-├─ include/
-│  ├─ utils_conc.h
-│  ├─ conv.h
-│  ├─ sobel.h
-│  ├─ rotate.h
-│  └─ resize.h
-├─ src/
-│  ├─ main.c
-│  ├─ conv.c
-│  ├─ sobel.c
-│  ├─ rotate.c
-│  └─ resize.c
-└─ third_party/
-   └─ (pon aquí stb_image.h y stb_image_write.h si usas la Opción B)
+```bash
+make
 ```
 
-## Notas de implementación
-- **Convolución**: soporta kernels 3×3/5×5 con padding por “clamp” y parámetros `factor` y `bias`.
-- **Sobel**: calcula bordes sobre **luminancia** (si RGB) y deja salida en 1 o 3 canales.
-- **Rotación**: mapeo inverso con **bilinear** (centro de imagen).
-- **Resize**: escalado **bilinear** destino→origen (sin aliasing severo).
-- **Hilos**: división por filas (`y0..y1`) con `pthread_create/join`.
+## Usage
 
-## TODO opcionales
-- Añadir kernels extra (sharpen, emboss, gaussian 5×5).
-- Soporte in-place con **buffer swap** (src↔dst).
-- Manejo de imágenes con alfa (RGBA).
+```bash
+./imagemuggle input.png output.png
+```
+
+Interactive menu options:
+1. Convolution (kernel size, factor, bias)
+2. Sobel edge detection
+3. Rotation (angle in degrees)
+4. Resize (new width/height)
+5. Exit
+
+Multiple operations can be applied sequentially before saving.
+
+## Project structure
+
+```
+include/
+├── utils_conc.h    # Threading utilities, 3D matrix operations
+├── conv.h          # Convolution operations
+├── sobel.h         # Edge detection
+├── rotate.h        # Image rotation
+└── resize.h        # Bilinear scaling
+
+src/
+├── main.c          # Interactive menu, image I/O
+├── utils_conc.c    # Matrix allocation, threading framework
+├── conv.c          # Kernel convolution implementation
+├── sobel.c         # Sobel operator implementation
+├── rotate.c        # Geometric transformation
+└── resize.c        # Bilinear interpolation
+
+third_party/
+├── stb_image.h
+└── stb_image_write.h
+```
+
+## Implementation Details
+
+All operations use the `WorkArgs` structure for thread communication and employ
+`launch_threads_by_rows()` for parallelization. The system supports both
+grayscale and RGB images with dynamic memory management through
+`create3DMatrix()` and proper cleanup procedures.
+
+Thread distribution divides image rows among worker threads, with each thread
+processing a contiguous range `[y0, y1)`. Synchronization occurs through
+`pthread_join()` without requiring mutexes due to non-overlapping memory
+regions.
+
+## Project Status
+
+Active development. Core functionality implemented and tested. Potential
+extensions include additional kernel types, in-place operations with buffer
+swapping, and RGBA channel support.
