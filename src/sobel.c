@@ -7,11 +7,13 @@
 static inline unsigned char clampi(int v) {
   return (unsigned char)(v < 0 ? 0 : (v > 255 ? 255 : v));
 }
+
 static inline unsigned char to_gray(unsigned char *px, int channels) {
   if (channels == 1)
     return px[0];
   return (unsigned char)(0.30f * px[0] + 0.59f * px[1] + 0.11f * px[2]);
 }
+
 static inline void clamp_xy(int *x, int *y, int width, int height) {
   if (*x < 0)
     *x = 0;
@@ -101,8 +103,8 @@ static void *worker_sobel(void *p) {
   return NULL;
 }
 
-int sobel_concurrente(unsigned char ***src, unsigned char ***dst, int width,
-                      int height, int channels, int num_threads) {
+int sobel_concurrent(unsigned char ***src, unsigned char ***dst, int width,
+                     int height, int channels, int num_threads) {
   WorkArgs base = {.src = src,
                    .dst = dst,
                    .width = width,

@@ -21,11 +21,6 @@ typedef struct {
 
 // Creates 3D matrix [height][width][channels] contiguous in memory
 unsigned char ***create3DMatrix(int height, int width, int channels);
-// Frees matrix created by create3DMatrix
-void free3DMatrix(unsigned char ***m);
-// Copy from src->dst (same dims)
-void copy3D(unsigned char ***src, unsigned char ***dst, int width, int height,
-            int channels);
 
 // Launch N threads executing 'worker' with row division
 int launch_threads_by_rows(void *(*worker)(void *), WorkArgs base,

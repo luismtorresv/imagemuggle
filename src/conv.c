@@ -5,6 +5,7 @@
 static inline unsigned char clampi(int v) {
   return (unsigned char)(v < 0 ? 0 : (v > 255 ? 255 : v));
 }
+
 static inline void clamp_xy(int *xx, int *yy, int w, int h) {
   if (*xx < 0)
     *xx = 0;
@@ -39,9 +40,9 @@ static void *worker_conv(void *p) {
   return NULL;
 }
 
-int conv_concurrente(unsigned char ***src, unsigned char ***dst, int width,
-                     int height, int channels, const float *kernel, int k,
-                     float factor, float bias, int num_threads) {
+int conv_concurrent(unsigned char ***src, unsigned char ***dst, int width,
+                    int height, int channels, const float *kernel, int k,
+                    float factor, float bias, int num_threads) {
   WorkArgs base = {.src = src,
                    .dst = dst,
                    .width = width,

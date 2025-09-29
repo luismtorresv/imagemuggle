@@ -42,31 +42,6 @@ unsigned char ***create3DMatrix(int height, int width, int channels) {
   return m;
 }
 
-void free3DMatrix(unsigned char ***m) {
-  if (!m)
-    return;
-  unsigned char *base = NULL;
-  // The first pixel points to the contiguous block
-  if (m[0] && m[0][0])
-    base = m[0][0];
-  int height =
-      0; // we don't have dims here; caller must know them and free rows
-  // We can't know 'height' from here without storing it; release rows and
-  // contiguous block. To simplify, we ask the caller to free manually:
-  //   for (int y=0;y<height;y++) free(m[y]);
-  //   free(m); free(base);
-  // To avoid errors, we do nothing here.
-}
-
-void copy3D(unsigned char ***src, unsigned char ***dst, int width, int height,
-            int channels) {
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      memcpy(dst[y][x], src[y][x], (size_t)channels);
-    }
-  }
-}
-
 int launch_threads_by_rows(void *(*worker)(void *), WorkArgs base,
                            int num_threads) {
   if (num_threads < 1)
@@ -125,7 +100,6 @@ int loadPNG(const char *path, unsigned char ****out_px, int *w, int *h,
     stbi_image_free(data);
     return -1;
   }
-  size_t row_bytes = (size_t)x * c;
   for (int yy = 0; yy < y; yy++) {
     for (int xx = 0; xx < x; xx++) {
       memcpy(m[yy][xx], data + (size_t)(yy * x + xx) * c, (size_t)c);

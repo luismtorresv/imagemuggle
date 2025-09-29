@@ -46,8 +46,8 @@ static void *worker_resize(void *p) {
   return NULL;
 }
 
-int resize_concurrente(unsigned char ***src, int w, int h, int channels,
-                       unsigned char ***dst, int nw, int nh, int num_threads) {
+int resize_concurrent(unsigned char ***src, int w, int h, int channels,
+                      unsigned char ***dst, int nw, int nh, int num_threads) {
   WorkArgs base = {
       .src = src, .dst = dst, .width = w, .height = h, .channels = channels};
 

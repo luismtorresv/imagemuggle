@@ -64,12 +64,6 @@ static void free_image3d(Image3D *img) {
   img->contiguous = NULL;
 }
 
-static void flat_to_3d(unsigned char *flat, Image3D *im) {
-  for (int y = 0; y < im->h; y++)
-    for (int x = 0; x < im->w; x++)
-      memcpy(im->m[y][x], flat + (size_t)(y * im->w + x) * im->c, im->c);
-}
-
 static void print_menu(void) {
   printf("\nImage Processing Menu\n");
   printf("1) Convolution (3x3 blur)\n");
@@ -137,7 +131,10 @@ int main(int argc, char **argv) {
       printf("  c) Heavy blur (5x applications)\n");
       printf("Choice (a/b/c): ");
       char choice;
-      scanf(" %c", &choice);
+      if (scanf(" %c", &choice) != 1) {
+        printf("Invalid input, using light blur\n");
+        choice = 'a';
+      }
 
       float k[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
       for (int i = 0; i < 9; i++)
@@ -161,7 +158,7 @@ int main(int argc, char **argv) {
 
       // Apply blur multiple times for stronger effect
       for (int i = 0; i < applications; i++) {
-        if (conv_concurrente(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4) != 0) {
+        if (conv_concurrent(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4) != 0) {
           fprintf(stderr, "Convolution failed\n");
           break;
         }
@@ -172,7 +169,7 @@ int main(int argc, char **argv) {
       }
       printf("Applied blur %d time(s)\n", applications);
     } else if (op == 2) {
-      if (sobel_concurrente(src, dst.m, w, h, c, 4) != 0) {
+      if (sobel_concurrent(src, dst.m, w, h, c, 4) != 0) {
         fprintf(stderr, "Sobel edge detection failed\n");
       } else {
         unsigned char ***tmp = src;
@@ -182,8 +179,11 @@ int main(int argc, char **argv) {
     } else if (op == 3) {
       float ang;
       printf("Angle (degrees): ");
-      scanf("%f", &ang);
-      if (rotate_concurrente(src, dst.m, w, h, c, ang, 4) != 0) {
+      if (scanf("%f", &ang) != 1) {
+        fprintf(stderr, "Invalid input for angle\n");
+        continue;
+      }
+      if (rotate_concurrent(src, dst.m, w, h, c, ang, 4) != 0) {
         fprintf(stderr, "Rotation failed\n");
       } else {
         unsigned char ***tmp = src;
@@ -193,15 +193,21 @@ int main(int argc, char **argv) {
     } else if (op == 4) {
       int nw, nh;
       printf("New width: ");
-      scanf("%d", &nw);
+      if (scanf("%d", &nw) != 1) {
+        fprintf(stderr, "Invalid input for width\n");
+        continue;
+      }
       printf("New height: ");
-      scanf("%d", &nh);
+      if (scanf("%d", &nh) != 1) {
+        fprintf(stderr, "Invalid input for height\n");
+        continue;
+      }
       Image3D out = alloc_image3d(nw, nh, c);
       if (!out.m) {
         fprintf(stderr, "Failed to allocate memory for resized image\n");
         continue;
       }
-      if (resize_concurrente(src, w, h, c, out.m, nw, nh, 4) != 0) {
+      if (resize_concurrent(src, w, h, c, out.m, nw, nh, 4) != 0) {
         fprintf(stderr, "Resize failed\n");
         free_image3d(&out);
       } else {
