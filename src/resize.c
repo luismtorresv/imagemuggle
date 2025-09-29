@@ -1,6 +1,7 @@
 #include "resize.h"
 #include <math.h>
 #include <pthread.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -54,6 +55,13 @@ int resize_concurrente(unsigned char ***src, int w, int h, int channels,
   ResizeArgs *thread_args = malloc(num_threads * sizeof(ResizeArgs));
   pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
 
+  // Check memory allocation
+  if (!thread_args || !threads) {
+    free(thread_args);
+    free(threads);
+    return -1;
+  }
+
   int rows_per_thread = nh / num_threads;
   int remainder = nh % num_threads;
 
@@ -67,7 +75,17 @@ int resize_concurrente(unsigned char ***src, int w, int h, int channels,
     thread_args[i].a.y1 =
         thread_args[i].a.y0 + rows_per_thread + (i < remainder ? 1 : 0);
 
-    pthread_create(&threads[i], NULL, worker_resize, &thread_args[i]);
+    // Check pthread_create
+    if (pthread_create(&threads[i], NULL, worker_resize, &thread_args[i]) !=
+        0) {
+      // Join already created threads
+      for (int j = 0; j < i; j++) {
+        pthread_join(threads[j], NULL);
+      }
+      free(thread_args);
+      free(threads);
+      return -1;
+    }
   }
 
   // Wait for all threads

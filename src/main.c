@@ -22,15 +22,37 @@ static Image3D alloc_image3d(int w, int h, int c) {
   img.c = c;
   // contiguous block
   img.contiguous = (unsigned char *)calloc((size_t)w * h * c, 1);
+  if (!img.contiguous) {
+    return img; // Return empty Image3D on failure
+  }
+
   img.m = (unsigned char ***)malloc(sizeof(unsigned char **) * h);
+  if (!img.m) {
+    free(img.contiguous);
+    img.contiguous = NULL;
+    return img; // Return empty Image3D on failure
+  }
+
   for (int y = 0; y < h; y++) {
     img.m[y] = (unsigned char **)malloc(sizeof(unsigned char *) * w);
+    if (!img.m[y]) {
+      // Free previously allocated rows
+      for (int i = 0; i < y; i++) {
+        free(img.m[i]);
+      }
+      free(img.m);
+      free(img.contiguous);
+      img.m = NULL;
+      img.contiguous = NULL;
+      return img; // Return empty Image3D on failure
+    }
     for (int x = 0; x < w; x++) {
       img.m[y][x] = img.contiguous + ((size_t)y * w + x) * c;
     }
   }
   return img;
 }
+
 static void free_image3d(Image3D *img) {
   if (!img || !img->m)
     return;
@@ -95,6 +117,10 @@ int main(int argc, char **argv) {
 
   // dst buffer
   Image3D dst = alloc_image3d(w, h, c);
+  if (!dst.m) {
+    fprintf(stderr, "Failed to allocate destination buffer\n");
+    return 1;
+  }
 
   int exit_flag = 0;
   while (!exit_flag) {
@@ -126,7 +152,7 @@ int main(int argc, char **argv) {
         applications = 3;
         break;
       case 'c':
-        applications = 10;
+        applications = 5;
         break;
       default:
         printf("Invalid choice, using light blur\n");
@@ -135,7 +161,10 @@ int main(int argc, char **argv) {
 
       // Apply blur multiple times for stronger effect
       for (int i = 0; i < applications; i++) {
-        conv_concurrente(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4);
+        if (conv_concurrente(src, dst.m, w, h, c, k, 3, 1.0f, 0.0f, 4) != 0) {
+          fprintf(stderr, "Convolution failed\n");
+          break;
+        }
         // swap buffers
         unsigned char ***tmp = src;
         src = dst.m;
@@ -143,18 +172,24 @@ int main(int argc, char **argv) {
       }
       printf("Applied blur %d time(s)\n", applications);
     } else if (op == 2) {
-      sobel_concurrente(src, dst.m, w, h, c, 4);
-      unsigned char ***tmp = src;
-      src = dst.m;
-      dst.m = tmp;
+      if (sobel_concurrente(src, dst.m, w, h, c, 4) != 0) {
+        fprintf(stderr, "Sobel edge detection failed\n");
+      } else {
+        unsigned char ***tmp = src;
+        src = dst.m;
+        dst.m = tmp;
+      }
     } else if (op == 3) {
       float ang;
       printf("Angle (degrees): ");
       scanf("%f", &ang);
-      rotate_concurrente(src, dst.m, w, h, c, ang, 4);
-      unsigned char ***tmp = src;
-      src = dst.m;
-      dst.m = tmp;
+      if (rotate_concurrente(src, dst.m, w, h, c, ang, 4) != 0) {
+        fprintf(stderr, "Rotation failed\n");
+      } else {
+        unsigned char ***tmp = src;
+        src = dst.m;
+        dst.m = tmp;
+      }
     } else if (op == 4) {
       int nw, nh;
       printf("New width: ");
@@ -162,15 +197,23 @@ int main(int argc, char **argv) {
       printf("New height: ");
       scanf("%d", &nh);
       Image3D out = alloc_image3d(nw, nh, c);
-      resize_concurrente(src, w, h, c, out.m, nw, nh, 4);
-      free_image3d(&dst);
-      dst = out;
-      // swap: we want src to be the new resized image
-      unsigned char ***tmp = src;
-      src = dst.m;
-      dst.m = tmp;
-      w = nw;
-      h = nh;
+      if (!out.m) {
+        fprintf(stderr, "Failed to allocate memory for resized image\n");
+        continue;
+      }
+      if (resize_concurrente(src, w, h, c, out.m, nw, nh, 4) != 0) {
+        fprintf(stderr, "Resize failed\n");
+        free_image3d(&out);
+      } else {
+        free_image3d(&dst);
+        dst = out;
+        // swap: we want src to be the new resized image
+        unsigned char ***tmp = src;
+        src = dst.m;
+        dst.m = tmp;
+        w = nw;
+        h = nh;
+      }
     } else if (op == 5) {
       exit_flag = 1;
     } else {
