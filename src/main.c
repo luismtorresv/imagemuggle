@@ -15,6 +15,28 @@ typedef struct {
   int w, h, c;
 } Image3D;
 
+/**
+ * Allocates and initializes a 3D image structure with specified dimensions.
+ *
+ * This function creates a 3D image with width, height, and channel dimensions.
+ * The image data is stored in a contiguous memory block for efficient access,
+ * while maintaining a 3D pointer structure (m[y][x]) that points into this
+ * contiguous block. Each pixel contains 'c' channels of unsigned char data.
+ *
+ * @param w Width of the image (number of pixels horizontally)
+ * @param h Height of the image (number of pixels vertically)
+ * @param c Number of channels per pixel (e.g., 1 for grayscale, 3 for RGB)
+ *
+ * @return Image3D structure with allocated memory on success, or an empty
+ *         Image3D structure (with NULL pointers) on allocation failure.
+ *         The caller is responsible for freeing the returned image using
+ *         an appropriate deallocation function.
+ *
+ * @note The function performs comprehensive error handling - if any allocation
+ *       fails, all previously allocated memory is freed before returning.
+ * @note Memory layout: contiguous block stores pixels row by row, with each
+ *       pixel's channels stored consecutively.
+ */
 static Image3D alloc_image3d(int w, int h, int c) {
   Image3D img = {0};
   img.w = w;
@@ -53,6 +75,20 @@ static Image3D alloc_image3d(int w, int h, int c) {
   return img;
 }
 
+/**
+ * Frees all dynamically allocated memory associated with an Image3D structure.
+ *
+ * This function safely deallocates the 2D array of pointers, the contiguous
+ * memory block, and resets the pointers to NULL to prevent dangling references.
+ * The function performs null pointer checks to avoid segmentation faults.
+ *
+ * @param img Pointer to the Image3D structure to be freed. Can be NULL.
+ *
+ * @note After calling this function, the Image3D structure itself is not freed,
+ *       only its internal dynamically allocated members.
+ * @note It's safe to call this function with a NULL pointer or partially
+ *       initialized Image3D structure.
+ */
 static void free_image3d(Image3D *img) {
   if (!img || !img->m)
     return;
@@ -77,6 +113,38 @@ static void print_menu(void) {
   printf("Option: ");
 }
 
+/**
+ * Main function for the image processing application
+ *
+ * This program provides an interactive menu-driven interface for applying
+ * various image processing operations to PNG images. It supports loading images
+ * from files or generating demo patterns for testing.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line arguments
+ *             argv[1]: Input PNG file path (optional)
+ *             argv[2]: Output PNG file path (optional)
+ *
+ * @return 0 on successful execution, 1 on error
+ *
+ * @details
+ * The program offers the following image processing operations:
+ * - Blur with selectable intensity (light/medium/heavy)
+ * - Sobel edge detection
+ * - Image rotation by specified angle
+ * - Image resizing to new dimensions
+ *
+ * Usage modes:
+ * - With 2+ args: Load input image, process interactively, save to output
+ * - With <2 args: Generate demo pattern for menu demonstration only
+ *
+ * The program uses double buffering (src/dst) and swaps buffers after each
+ * operation to allow chaining of multiple effects. All operations support
+ * concurrent processing with 4 threads by default.
+ *
+ * @note Requires stb headers for PNG support, compile with -DUSE_STB
+ * -Ithird_party
+ */
 int main(int argc, char **argv) {
   if (argc < 3) {
     fprintf(stderr, "Usage: %s input.png output.png\n", argv[0]);

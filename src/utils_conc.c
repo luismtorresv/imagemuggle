@@ -14,6 +14,28 @@
 
 #include "utils_conc.h"
 
+/**
+ * Creates a 3D matrix with contiguous memory layout for image data
+ *
+ * Allocates memory for a 3D matrix structure that can be accessed as
+ * m[y][x][channel]. The actual data is stored in a contiguous block for better
+ * cache performance, while maintaining the convenience of 3D array indexing
+ * through pointer tables.
+ *
+ * @param height Number of rows in the matrix
+ * @param width Number of columns in the matrix
+ * @param channels Number of channels per pixel (e.g., 3 for RGB, 4 for RGBA)
+ *
+ * @return Pointer to the 3D matrix structure on success, NULL on memory
+ * allocation failure
+ *
+ * @note The returned matrix should be freed using a corresponding free3DMatrix
+ * function
+ * @note Memory layout: contiguous data block + height pointers + (height *
+ * width) pointers
+ * @warning Returns NULL if any memory allocation fails; all previously
+ * allocated memory is cleaned up
+ */
 unsigned char ***create3DMatrix(int height, int width, int channels) {
   // contiguous layout: [height * width * channels] + pointer tables
   unsigned char *data =
@@ -42,6 +64,31 @@ unsigned char ***create3DMatrix(int height, int width, int channels) {
   return m;
 }
 
+/**
+ * Launches worker threads to process image data by dividing rows among threads
+ *
+ * This function creates multiple threads to process an image or data structure
+ * by dividing the total number of rows evenly among the specified number of
+ * threads. Each thread receives a copy of the base WorkArgs with modified y0
+ * and y1 values to define its row processing range.
+ *
+ * @param worker Function pointer to the worker function that each thread will
+ * execute. The function should accept a void* parameter (WorkArgs*) and return
+ * void*.
+ * @param base Base WorkArgs structure containing common parameters for all
+ * threads. The height field is used to determine total rows to process.
+ * @param num_threads Number of threads to create. If less than 1, defaults
+ * to 1.
+ *
+ * @return 0 on success, -1 on failure (malloc error or pthread_create error)
+ *
+ * @note The function automatically handles row boundaries to ensure no thread
+ *       processes rows beyond the total height.
+ * @note All threads are joined before the function returns, ensuring completion
+ *       of all work before cleanup.
+ * @note Memory for thread IDs and arguments is automatically allocated and
+ * freed.
+ */
 int launch_threads_by_rows(void *(*worker)(void *), WorkArgs base,
                            int num_threads) {
   if (num_threads < 1)
@@ -78,6 +125,28 @@ int launch_threads_by_rows(void *(*worker)(void *), WorkArgs base,
   return 0;
 }
 
+/**
+ * Loads a PNG image from file and converts it to a 3D matrix format
+ *
+ * This function loads a PNG image using the stb_image library and converts the
+ * linear pixel data into a 3D matrix where pixels can be accessed as
+ * matrix[y][x][channel]. Requires USE_STB to be defined and stb_image headers
+ * to be included.
+ *
+ * @param path Path to the PNG file to load
+ * @param out_px Pointer to store the allocated 3D pixel matrix (y, x, channels)
+ * @param w Pointer to store the image width
+ * @param h Pointer to store the image height
+ * @param ch Pointer to store the number of channels (e.g., 3 for RGB, 4 for
+ * RGBA)
+ *
+ * @return 0 on success, -1 on failure (file not found, memory allocation error,
+ *         or USE_STB not defined)
+ *
+ * @note The caller is responsible for freeing the allocated 3D matrix memory
+ * @note Prints warning to stderr if USE_STB is not defined
+ * @note Prints error to stderr if file cannot be loaded
+ */
 // ------- Optional: I/O with stb --------
 int loadPNG(const char *path, unsigned char ****out_px, int *w, int *h,
             int *ch) {
@@ -111,6 +180,25 @@ int loadPNG(const char *path, unsigned char ****out_px, int *w, int *h,
 #endif
 }
 
+/**
+ * Saves a 3D pixel array as a PNG image file
+ *
+ * This function converts a 3-dimensional pixel array into a flat buffer and
+ * saves it as a PNG image using the STB image library. The function requires
+ * STB to be available (USE_STB must be defined).
+ *
+ * @param path The file path where the PNG image will be saved
+ * @param px 3D array of pixel data [height][width][channels]
+ * @param w Width of the image in pixels
+ * @param h Height of the image in pixels
+ * @param ch Number of channels per pixel (e.g., 3 for RGB, 4 for RGBA)
+ *
+ * @return 0 on success, -1 on failure (memory allocation error, STB not
+ * available, or PNG write failure)
+ *
+ * @note Requires STB image library to be compiled with USE_STB defined
+ * @warning Function prints a warning to stderr if STB is not available
+ */
 int savePNG(const char *path, unsigned char ***px, int w, int h, int ch) {
 #ifndef USE_STB
   fprintf(stderr,

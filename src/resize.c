@@ -4,11 +4,43 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * Arguments structure for image resize operations
+ *
+ * This structure extends the base WorkArgs structure with additional
+ * parameters specific to resize operations, including the target dimensions.
+ *
+ * @param a Base work arguments structure containing common operation parameters
+ * @param nw New width for the resized image
+ * @param nh New height for the resized image
+ */
 typedef struct {
   WorkArgs a;
   int nw, nh;
 } ResizeArgs;
 
+/**
+ * Performs bilinear interpolation to sample a pixel value from a 3D image
+ * array.
+ *
+ * This function implements bilinear interpolation to calculate the pixel value
+ * at non-integer coordinates by interpolating between the four nearest pixels.
+ * The function handles boundary conditions by clamping coordinates to valid
+ * ranges.
+ *
+ * @param src    3D array representing the image data [height][width][channels]
+ * @param w      Width of the image in pixels
+ * @param h      Height of the image in pixels
+ * @param c      Channel index to sample from (e.g., 0=R, 1=G, 2=B for RGB)
+ * @param xs     X-coordinate to sample (can be fractional)
+ * @param ys     Y-coordinate to sample (can be fractional)
+ *
+ * @return       Interpolated pixel value as an unsigned char (0-255)
+ *
+ * @note         Coordinates outside image bounds are clamped to nearest valid
+ * pixel
+ * @note         Uses lrintf() for proper rounding of final interpolated value
+ */
 static unsigned char bilinear(unsigned char ***src, int w, int h, int c,
                               float xs, float ys) {
   int x0 = (int)floorf(xs), y0 = (int)floorf(ys);
@@ -29,6 +61,27 @@ static unsigned char bilinear(unsigned char ***src, int w, int h, int c,
   return (unsigned char)lrintf(v0 * (1 - ty) + v1 * ty);
 }
 
+/**
+ * Worker thread function for image resizing using bilinear interpolation.
+ *
+ * This function performs bilinear interpolation to resize a portion of an
+ * image. It calculates scaling factors and maps destination pixels to source
+ * coordinates, then applies bilinear interpolation for each color channel.
+ *
+ * @param p Pointer to ResizeArgs structure containing:
+ *          - a: WorkArgs with source/destination buffers, dimensions, and work
+ * range
+ *          - nw: New width (destination width)
+ *          - nh: New height (destination height)
+ *
+ * @return NULL (standard pthread worker return value)
+ *
+ * @note The function processes rows from a->y0 to a->y1 (exclusive) for
+ * parallelization
+ * @note Uses center-point sampling with 0.5 pixel offset for better
+ * interpolation
+ * @note Assumes bilinear() function is available for pixel interpolation
+ */
 static void *worker_resize(void *p) {
   ResizeArgs *R = (ResizeArgs *)p;
   WorkArgs *a = &R->a;
@@ -46,6 +99,36 @@ static void *worker_resize(void *p) {
   return NULL;
 }
 
+/**
+ * Resizes an image using multiple threads for concurrent processing.
+ *
+ * This function performs image resizing by distributing the work across
+ * multiple threads, where each thread processes a portion of the output image
+ * rows. The image is resized from the source dimensions (w x h) to the new
+ * dimensions (nw x nh).
+ *
+ * @param src Pointer to 3D array containing source image data
+ * [height][width][channels]
+ * @param w Width of the source image in pixels
+ * @param h Height of the source image in pixels
+ * @param channels Number of color channels in the image (e.g., 3 for RGB, 4 for
+ * RGBA)
+ * @param dst Pointer to 3D array where resized image data will be stored
+ * [nh][nw][channels]
+ * @param nw Target width of the resized image in pixels
+ * @param nh Target height of the resized image in pixels
+ * @param num_threads Number of worker threads to use for concurrent processing
+ *
+ * @return 0 on success, -1 on failure (memory allocation error or thread
+ * creation failure)
+ *
+ * @note The destination image buffer must be pre-allocated before calling this
+ * function
+ * @note If thread creation fails, all previously created threads are properly
+ * joined
+ * @note Work is distributed evenly among threads with remainder rows assigned
+ * to first threads
+ */
 int resize_concurrent(unsigned char ***src, int w, int h, int channels,
                       unsigned char ***dst, int nw, int nh, int num_threads) {
   WorkArgs base = {
